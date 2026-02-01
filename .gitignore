@@ -1,0 +1,14 @@
+/target/
+/config/
+/logs/
+/releases/
+/.settings/
+/benchmarks/
+/.project
+/.classpath
+/cache/
+/downloads/
+/models/
+/llama.cpp/
+/build/
+/llamacpp/

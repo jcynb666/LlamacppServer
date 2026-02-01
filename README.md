@@ -1,0 +1,176 @@
+# Llama.cpp 模型管理系统
+
+这是一个个人自用的 llama.cpp 模型管理工具，提供完整的模型加载、管理和交互功能。
+
+> **注意**：尽管本项目作为 Java 应用具有跨平台的特性，但开发目标是专门用于 **AI MAX+ 395** 这台特殊的计算机平台。
+---
+> **注意**：关于Linux的编译脚本，请注意JAVA_HOME的配置，默认使用该路径：/opt/jdk-24.0.2/。请修改为你所使用的路径再进行编译，并且修改时请务必注意：Windows 使用 CRLF（\r\n）作为换行符，而 Linux 使用 LF（\n）。
+---
+
+## API兼容情况（llamacpp自身支持OpenAI Compatible和Anthropic API）
+| 类型 | 接口路径 | 说明 |
+|------|----------|------|
+| 兼容 Ollama 的 | `/api/tags`<br>`/api/show`<br>`/api/chat`<br>`/api/embed`<br>`/api/ps` | 支持 Ollama 兼容接口，可用于模型查看、聊天、嵌入向量等操作 |
+| 不兼容 Ollama 的 | `/api/copy`<br>`/api/delete`<br>`/api/pull`<br>`/api/push`<br>`/api/generate` | 不支持 Ollama 的相关操作，如模型复制、删除、拉取、推送和生成 |
+| 兼容 lmStudio 的 | `/api/v0/models`<br>`/api/v0/chat/completions` | 支持 lmStudio 的模型查询与对话功能 |
+| 不兼容 lmStudio 的 | `/api/v0/completions`<br>`/api/v0/embeddings` | 不支持 lmStudio 的完整生成和嵌入接口（还没做） |
+
+
+
+## 主要功能
+
+### 📦 模型管理
+
+- **模型扫描与管理**：自动扫描指定目录下的所有 GGUF 格式模型，支持多个模型根目录
+- **模型加载与停止**：一键加载或停止模型，支持异步加载和状态监控
+- **模型收藏与别名**：为常用模型设置收藏标记和自定义别名，方便快速识别
+- **模型详情查看**：查看模型的详细信息，包括元数据、运行指标（metrics）和属性（props）
+- **分卷模型支持**：自动识别和处理分卷模型文件（如 `*-00001-of-*.gguf`）
+- **多模态模型支持**：支持带视觉组件的模型（mmproj 文件）
+
+![屏幕截图_26-1-2026_16367_10 8 0 10](https://github.com/user-attachments/assets/66d62ff2-7136-4164-823f-3b52f2dea327)
+
+
+
+### 🌐 模型下载
+- **模型搜索**：支持从HuggingFace和hf-mirror上搜索并下载gguf模型
+- **断点续传**：支持断点续传功能，网络中断后可继续下载
+- **并发下载**：最多支持 4 个任务同时下载，其余任务进入等待队列
+- **进度监控**：通过 WebSocket 实时推送下载进度
+- **任务管理**：支持任务的暂停、恢复、删除和状态持久化
+- 
+![屏幕截图_18-1-2026_173859_192 168 5 12](https://github.com/user-attachments/assets/06d3688d-9e33-443a-8993-7ef539b7f8fb)
+![屏幕截图_18-1-2026_17395_192 168 5 12](https://github.com/user-attachments/assets/d8efe2a3-6439-4a11-9252-5ade3a48387b)
+
+### 🖥️ Web 管理界面
+
+- **模型列表**：直观展示所有模型，支持搜索、排序（按名称、大小、参数量）
+- **加载配置**：配置模型启动参数，包括上下文大小、批处理、温度、Top-P、Top-K 等
+- **对话界面**：内置聊天界面，可直接与加载的模型进行对话
+- **下载管理**：管理下载任务，查看进度和状态
+- **控制台日志**：实时查看系统日志，支持自动刷新
+- **系统设置**：配置模型目录和 llama.cpp 可执行文件路径
+
+![屏幕截图_26-1-2026_16342_127 0 0 1](https://github.com/user-attachments/assets/47af570e-8623-4f53-a1d6-c7f2cec072fb)
+![屏幕截图_26-1-2026_163419_127 0 0 1](https://github.com/user-attachments/assets/1c33e4bc-84db-45e6-ac89-133bd83bc6b9)
+
+![屏幕截图_18-1-2026_173926_192 168 5 12](https://github.com/user-attachments/assets/25cfffe2-7637-4f51-8a50-26c90bf250ae)
+
+
+### 🔌 API 兼容性
+
+- **OpenAI API**：兼容 OpenAI API 格式（默认端口 8080），可直接接入现有应用
+- **Anthropic API**：兼容 Anthropic API 格式（端口 8070），理论可用，但是程序写死无法配置密钥
+
+### ⚡ 性能测试
+
+- **模型基准测试**：对模型进行性能测试，评估推理速度
+- **多参数配置**：支持配置重复次数、提示长度、生成长度、批量大小等测试参数
+- **结果对比**：保存和对比多次测试结果，分析性能差异
+- **测试结果管理**：查看、追加、删除测试结果文件
+
+![屏幕截图_18-1-2026_174319_192 168 5 12](https://github.com/user-attachments/assets/732b85ac-b980-458d-bc4f-20a2094f10c0)
+
+
+
+
+### 📊 系统监控
+
+- **实时状态**：通过 WebSocket 实时推送模型加载/停止事件
+- **日志广播**：控制台日志实时广播到 Web 界面
+- **进程管理**：监控模型进程的运行状态和端口分配
+
+![屏幕截图_18-1-2026_174355_192 168 5 12](https://github.com/user-attachments/assets/c7091caa-78ef-47aa-862d-2d396ed80385)
+![屏幕截图_18-1-2026_174425_192 168 5 12](https://github.com/user-attachments/assets/0ce94222-6d1f-4912-b811-f3fe13d6c792)
+
+
+### ⚙️ 配置管理
+
+- **启动配置保存**：为每个模型保存独立的启动参数配置
+- **多版本支持**：支持配置多个 llama.cpp 版本路径，加载时选择
+- **多目录支持**：支持配置多个模型目录，自动合并检索
+- **配置持久化**：所有配置自动保存到本地文件
+
+### 📱 移动端适配
+
+<img src="https://github.com/user-attachments/assets/f848a936-1e8e-4bfb-8a47-59a2b32b856a" width="20%">
+<img src="https://github.com/user-attachments/assets/82fe0c28-53f0-4fa9-812f-1ecb7c9cf3c0" width="20%">
+<img src="https://github.com/user-attachments/assets/b40fdcf3-595e-47db-b2a4-7b204a84902a" width="20%">
+<img src="https://github.com/user-attachments/assets/8baef036-2eb8-407e-875b-04d63c6a5ab4" width="20%">
+
+### 🔧 其它功能
+
+- **显存估算**：根据上下文大小、批处理等参数估算所需的显存占用（对于视觉模型不准确）
+- **KV 缓存管理**：可使用llama.cpp的KV保存本地功能
+- **Embedding 模式**：支持将模型用于文本嵌入
+- **Reranking 模式**：支持将模型用于重排序任务
+
+---
+
+## 使用说明
+
+### 手动编译
+
+```bash
+# Windows
+javac-win.bat
+
+# Linux
+javac-linux.sh
+```
+
+> **注意**：关于Linux的编译脚本，请注意JAVA_HOME的配置，默认使用该路径：/opt/jdk-24.0.2/。请修改为你所使用的路径再进行编译，并且修改时请务必注意：Windows 使用 CRLF（\r\n）作为换行符，而 Linux 使用 LF（\n）。
+---
+
+### 直接下载
+直接从release下载编译好的程序使用
+
+### 启动程序
+编译成功后，在build目录下找到启动脚本：run.sh或者run.bat，运行即可。
+
+### 访问 Web 界面
+
+启动成功后，在浏览器中访问：
+
+- 主界面：`http://localhost:8080`
+- 对话界面：`http://localhost:8080/chat/completion.html`
+- 下载管理：`http://localhost:8080/download.html`
+
+### 配置模型目录和 llama.cpp 路径
+
+1. 打开 Web 界面
+2. 点击左侧菜单的「系统设置」
+3. 添加模型目录（可添加多个）
+4. 添加 llama.cpp 可执行文件路径（可添加多个版本）
+
+### 加载模型
+
+1. 在模型列表中找到要加载的模型
+2. 点击「加载」按钮
+3. 配置启动参数（可使用已保存的配置）
+4. 点击「加载模型」开始加载
+
+### 使用 API
+
+加载模型后，可通过以下方式调用：
+
+- **OpenAI API**：`http://localhost:8080/v1/chat/completions`
+- **Anthropic API**：`http://localhost:8070/v1/messages`
+- **Completion API**：`http://localhost:8080/completion`
+
+---
+
+## 技术特点
+
+- 基于 Netty 构建 Web 服务器
+- WebSocket 实现实时通信
+- 支持 GGUF 模型元数据读取
+- 进程管理和端口自动分配
+- 完整的配置持久化机制
+
+---
+
+## 系统要求
+
+- Java 21 运行环境
+- 已编译的 llama.cpp 可执行文件

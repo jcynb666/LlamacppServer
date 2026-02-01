@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Llama.cpp 模型管理系统</title>
+    <link rel="stylesheet" href="css/all.min.css">
+    <link href="css/css2.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/index.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <a href="#" class="app-logo">
+                <i class="fas fa-brain"></i>
+                <span>Llama Manager</span>
+            </a>
+        </div>
+        <nav class="sidebar-nav">
+        
+            <a href="#" class="nav-item active" id="nav-model-list" onclick="showModelList(); return false;">
+                <i class="fas fa-cubes"></i>
+                <span>模型列表</span>
+            </a>
+            <a href="chat/completion.html" class="nav-item" target="_blank" id="nav-chat-completion">
+                <i class="fas fa-comments"></i>
+                <span>对话界面</span>
+            </a>
+            <a href="#" class="nav-item" id="nav-download" onclick="showDownloadManager(); return false;">
+                <i class="fas fa-download"></i>
+                <span>下载管理</span>
+            </a>
+            <a href="#" class="nav-item" id="nav-hf" onclick="showHuggingFace(); return false;">
+                <i class="fas fa-cloud"></i>
+                <span>HuggingFace 模型</span>
+            </a>
+            <a href="#" class="nav-item" onclick="openConsoleModal(); return false;">
+                <i class="fas fa-terminal"></i>
+                <span>控制台日志</span>
+            </a>
+            <a href="#" class="nav-item" id="nav-llamacpp" onclick="showLlamaCppSetting(); return false;">
+                <i class="fas fa-microchip"></i>
+                <span>Llama.cpp 路径</span>
+            </a>
+            <a href="#" class="nav-item" id="nav-model-path" onclick="showModelPathSetting(); return false;">
+                <i class="fas fa-folder-open"></i>
+                <span>模型路径配置</span>
+            </a>
+            <a href="#" class="nav-item" id="nav-settings" onclick="showSettingsPage(); return false;">
+                <i class="fas fa-cog"></i>
+                <span>设置</span>
+            </a>
+            <div style="flex: 1"></div>
+             <a href="#" class="nav-item danger" onclick="shutdownService(); return false;">
+                <i class="fas fa-power-off"></i>
+                <span>停止服务</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                Llama.cpp Server<br>v1.0.0
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area" id="main-model-list">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <h1 class="page-title">模型管理</h1>
+            <div class="top-actions">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="modelSearchInput" class="search-input" placeholder="搜索模型...">
+                </div>
+                <button class="btn btn-secondary" onclick="refreshModels()" title="刷新列表">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable Content -->
+        <div class="content-scrollable">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="loadedModelsCount">0</h3>
+                        <p>已加载模型</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-box-open"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalModelsCount">0</h3>
+                        <p>模型总数</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model List -->
+            <div class="model-list-container">
+                <div class="model-list-header">
+                    <h2>所有模型</h2>
+                    <div style="margin-left: auto;">
+                        <select id="modelSortSelect" class="form-control" style="padding: 4px 8px; width: auto; font-size: 0.875rem;" onchange="sortAndRenderModels()">
+                            <option value="name_asc">名称 (A-Z)</option>
+                            <option value="name_desc">名称 (Z-A)</option>
+                            <option value="size_asc">文件大小 (小到大)</option>
+                            <option value="size_desc">文件大小 (大到小)</option>
+                            <option value="params_asc">参数量 (小到大)</option>
+                            <option value="params_desc">参数量 (大到小)</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="modelsList">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <main class="main-area" id="main-download" style="display: none">
+        <div class="top-bar">
+            <h1 class="page-title">下载管理</h1>
+            <div class="top-actions">
+                <button class="btn btn-primary" onclick="DownloadManager.openCreateDownloadModal()" style="display: none">
+                    <i class="fas fa-plus"></i>
+                    创建下载任务
+                </button>
+            </div>
+        </div>
+
+        <div class="content-scrollable">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-download"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="activeDownloadsCount">0</h3>
+                        <p>活跃下载</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="pendingDownloadsCount">0</h3>
+                        <p>等待队列</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="completedDownloadsCount">0</h3>
+                        <p>已完成</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-list"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalDownloadsCount">0</h3>
+                        <p>总任务数</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="download-list-container">
+                <div class="download-list-header">
+                    <h2>下载任务</h2>
+                    <div style="margin-left: auto;">
+                        <button class="btn btn-secondary" onclick="DownloadManager.refreshDownloads()" title="刷新列表">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="downloadsList">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+
+    <main class="main-area" id="main-llamacpp-setting" style="display: none">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <h1 class="page-title">Llama.cpp 路径管理</h1>
+            <div class="top-actions">
+                <button class="btn btn-secondary" onclick="loadLlamaCppList()" title="刷新列表">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable Content -->
+        <div class="content-scrollable">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-microchip"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="llamacppCount">0</h3>
+                        <p>已配置路径</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Llama.cpp List -->
+            <div class="model-list-container">
+                <div class="model-list-header">
+                    <h2>Llama.cpp 路径列表</h2>
+                    <button class="btn btn-primary" onclick="openAddLlamaCppModal()">
+                        <i class="fas fa-plus"></i> 添加路径
+                    </button>
+                </div>
+                <div id="llamacppList">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <main class="main-area" id="main-model-path-setting" style="display: none">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <h1 class="page-title">模型路径配置</h1>
+            <div class="top-actions">
+                <button class="btn btn-secondary" onclick="loadModelPathList()" title="刷新列表">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable Content -->
+        <div class="content-scrollable">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="modelPathCount">0</h3>
+                        <p>已配置路径</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Path List -->
+            <div class="model-list-container">
+                <div class="model-list-header">
+                    <h2>模型路径列表</h2>
+                    <button class="btn btn-primary" onclick="openAddModelPathModal()">
+                        <i class="fas fa-plus"></i> 添加路径
+                    </button>
+                </div>
+                <div id="modelPathList">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <main class="main-area" id="main-settings" style="display: none">
+        <div class="top-bar">
+            <h1 class="page-title">设置</h1>
+        </div>
+
+        <div class="content-scrollable">
+            <div class="settings-layout">
+                <div class="settings-menu" role="tablist" aria-label="设置选项">
+                    <button class="settings-menu-item active" type="button" role="tab" aria-selected="true" data-tab="general" onclick="selectSettingsTab('general')">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>常规设置</span>
+                    </button>
+                    <button class="settings-menu-item" type="button" role="tab" aria-selected="false" data-tab="stress" onclick="selectSettingsTab('stress')">
+                        <i class="fas fa-bolt"></i>
+                        <span>压力测试</span>
+                    </button>
+                    <button class="settings-menu-item" type="button" role="tab" aria-selected="false" data-tab="mcp" onclick="selectSettingsTab('mcp')">
+                        <i class="fas fa-toolbox"></i>
+                        <span>MCP 管理</span>
+                    </button>
+                </div>
+
+                <div class="settings-content">
+                    <div class="settings-panel" data-tab-panel="general">
+                        <div class="model-list-container">
+                            <div class="model-list-header">
+                                <h2>常规设置</h2>
+                            </div>
+                            <div class="settings-panel-body">
+                                <div class="form-group" style="margin: 0;">
+                                    <label class="form-label">兼容服务</label>
+                                    <small class="form-text">用于快速启停本机兼容服务（Ollama / LMStudio）。</small>
+                                </div>
+                                <div class="settings-toggle-list">
+                                    <div class="settings-toggle-row">
+                                        <div class="settings-toggle-title">
+                                            <i class="fas fa-plug"></i>
+                                            <span>Ollama</span>
+                                        </div>
+                                        <div class="settings-compat-actions">
+                                            <div class="settings-port-field">
+                                                <span class="settings-port-label">端口</span>
+                                                <input class="form-control settings-port-input" type="number" min="1" max="65535" step="1" id="ollamaCompatPortInput" placeholder="11434">
+                                            </div>
+                                            <div class="form-check" style="margin: 0;">
+                                                <input class="form-check-input" type="checkbox" id="toggleOllamaCompat">
+                                                <label class="form-check-label" for="toggleOllamaCompat">启用</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="settings-toggle-row">
+                                        <div class="settings-toggle-title">
+                                            <i class="fas fa-plug"></i>
+                                            <span>LMStudio</span>
+                                        </div>
+                                        <div class="settings-compat-actions">
+                                            <div class="settings-port-field">
+                                                <span class="settings-port-label">端口</span>
+                                                <input class="form-control settings-port-input" type="number" min="1" max="65535" step="1" id="lmstudioCompatPortInput" placeholder="1234">
+                                            </div>
+                                            <div class="form-check" style="margin: 0;">
+                                                <input class="form-check-input" type="checkbox" id="toggleLmstudioCompat">
+                                                <label class="form-check-label" for="toggleLmstudioCompat">启用</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="settings-actions-row">
+                                    <button class="btn btn-primary" type="button" id="saveCompatPortsBtn">保存端口</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="model-list-container" style="margin-top: 1rem;">
+                            <div class="model-list-header">
+                                <h2>联网搜索</h2>
+                            </div>
+                            <div class="settings-panel-body">
+                                <div class="form-group" style="margin: 0;">
+                                    <label class="form-label" for="zhipuSearchApiKeyInput">智谱 API Key</label>
+                                    <input type="password" class="form-control" id="zhipuSearchApiKeyInput" placeholder="填写后点击保存">
+                                    <small class="form-text">默认使用智谱的联网搜索工具，由于本软件默认只有Http，无法保证网络安全，请确保在内网等安全的环境下使用，保护好自己的Key（我还没有时间开发基于搜索引擎的联网搜索，就拿这个凑合吧）。</small>
+                                </div>
+                                <div class="settings-actions-row">
+                                    <button class="btn btn-primary" type="button" id="saveZhipuSearchApiKeyBtn">保存</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-panel" data-tab-panel="stress" style="display: none;">
+                        <div class="model-list-container">
+                            <div class="model-list-header">
+                                <h2>压力测试</h2>
+                                <div style="margin-left: auto;">
+                                    <a class="btn btn-secondary" href="chat/concurrency.html" target="_blank" rel="noopener">新窗口打开</a>
+                                </div>
+                            </div>
+                            <div class="settings-panel-body">
+                                <iframe class="settings-embed-frame" title="压力测试" data-src="chat/concurrency.html" loading="lazy"></iframe>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="settings-panel" data-tab-panel="mcp" style="display: none;">
+                        <div class="model-list-container">
+                            <div class="model-list-header">
+                                <h2>MCP 管理</h2>
+                                <div style="margin-left: auto;">
+                                    <a class="btn btn-secondary" href="tools/mcp-manager.html" target="_blank" rel="noopener">新窗口打开</a>
+                                </div>
+                            </div>
+                            <div class="settings-panel-body">
+                                <iframe class="settings-embed-frame" title="MCP 管理" data-src="tools/mcp-manager.html" loading="lazy"></iframe>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <main class="main-area" id="main-hf" style="display: none">
+        <div class="top-bar">
+            <h1 class="page-title">HuggingFace 模型浏览</h1>
+        </div>
+
+        <div class="content-scrollable">
+            <div class="hf-search-row">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="hfSearchInput" class="search-input" placeholder="搜索 GGUF 模型（例如：Qwen3 8B）">
+                </div>
+                <select id="hfBaseSelect" class="form-control" style="padding: 4px 8px; width: auto; font-size: 0.875rem;">
+                    <option value="mirror" selected>hf-mirror.com</option>
+                    <option value="official">huggingface.co</option>
+                </select>
+                <select id="hfLimit" class="form-control" style="padding: 4px 8px; width: auto; font-size: 0.875rem;">
+                    <option value="30" selected>30</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <button class="btn btn-primary" onclick="hfSearch()">
+                    <i class="fas fa-search"></i>
+                    搜索
+                </button>
+            </div>
+            <div class="model-list-container">
+                <div id="hfHitsList">
+                    <div class="empty-state">输入关键字并点击搜索</div>
+                </div>
+                <div class="hf-hits-footer" id="hfHitsFooter" style="display:none;">
+                    <button class="btn btn-secondary" id="hfLoadMoreBtn" onclick="hfLoadMore()">加载更多</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Llama.cpp Modal -->
+    <div class="modal" id="addLlamaCppModal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 class="modal-title">添加 Llama.cpp 路径</h3>
+                <button class="modal-close" onclick="closeModal('addLlamaCppModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">目录路径 <span style="color: red;">*</span></label>
+                    <input class="form-control" id="addLlamaCppPathInput" placeholder="/path/to/llama.cpp">
+                    <small class="form-text">输入已编译的 llama.cpp 根目录路径。</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">名称</label>
+                    <input class="form-control" id="addLlamaCppNameInput" placeholder="llama.cpp">
+                    <small class="form-text">可选，留空则使用目录名作为名称。</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">描述</label>
+                    <textarea class="form-control" id="addLlamaCppDescInput" rows="3" placeholder="描述信息"></textarea>
+                    <small class="form-text">可选，添加关于此路径的描述。</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addLlamaCppModal')">取消</button>
+                <button class="btn btn-primary" onclick="addLlamaCpp()">保存</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Load Model Modal -->
+    <div class="modal" id="loadModelModal">
+        <div class="modal-content load-model-modal">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-upload" id="modelActionModalIcon"></i> <span id="modelActionModalTitleText">加载模型</span></h3>
+                <button class="modal-close" onclick="closeModal('loadModelModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="loadModelForm">
+                    <!-- 左右两侧布局 -->
+                    <div class="load-model-layout">
+                        <!-- 左侧：模型ID、Llama.cpp 版本、设备选择 -->
+                        <div id="basicParamsContainer">
+                            <div class="form-group">
+                                <label class="form-label" for="modelId">模型ID</label>
+                                <input type="text" class="form-control" id="modelId" name="modelId" readonly style="background-color: #f3f4f6; display: none;">
+                                <input type="text" class="form-control" id="modelName" name="modelName" readonly style="background-color: #f3f4f6;">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="llamaBinPathSelect">Llama.cpp 版本</label>
+                                <select class="form-control" id="llamaBinPathSelect" name="llamaBinPathSelect"></select>
+                            </div>
+
+                            <div class="form-group" id="modelCapabilitiesGroup">
+                                <label class="form-label">模型能力</label>
+                                <small class="form-text">手动标注模型能力/类型，处理无法准确识别的 GGUF 模型；更改将自动保存</small>
+                                <div style="border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 0.75rem;">
+                                    <div class="form-check" style="margin-bottom: 0.5rem;">
+                                        <input class="form-check-input" type="checkbox" id="capabilityThinking">
+                                        <label class="form-check-label" for="capabilityThinking">推理</label>
+                                    </div>
+                                    <div class="form-check" style="margin-bottom: 0.5rem;">
+                                        <input class="form-check-input" type="checkbox" id="capabilityTools">
+                                        <label class="form-check-label" for="capabilityTools">工具</label>
+                                    </div>
+                                    <div class="form-check" style="margin-bottom: 0.5rem;">
+                                        <input class="form-check-input" type="checkbox" id="capabilityRerank">
+                                        <label class="form-check-label" for="capabilityRerank">重排</label>
+                                    </div>
+                                    <div class="form-check" style="margin-bottom: 0;">
+                                        <input class="form-check-input" type="checkbox" id="capabilityEmbedding">
+                                        <label class="form-check-label" for="capabilityEmbedding">嵌入</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group" id="enableVisionGroup" style="display:none;">
+                                <label class="form-label">启用视觉</label>
+                                <div class="form-check" style="margin-bottom: 0;">
+                                    <input class="form-check-input" type="checkbox" id="enableVision" name="enableVision" checked>
+                                    <label class="form-check-label" for="enableVision">启用</label>
+                                </div>
+                                <small class="form-text">关闭后将不会使用 --mmproj 参数，即不启用多模态</small>
+                            </div>
+                            
+                            <div class="form-group" id="mainGpuGroup">
+                                <label class="form-label" for="mainGpuSelect">主GPU (main-gpu)</label>
+                                <select class="form-control" id="mainGpuSelect" name="mg">
+                                    <option value="-1">默认</option>
+                                </select>
+                                <small class="form-text">选择 llama.cpp 运行所使用的主要 GPU</small>
+                                <small class="form-text" id="ctxSizeVramHint" style="color: red; font-weight: 500; white-space: pre-wrap; display: block; margin-top: 8px;"></small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">可用计算设备</label>
+                                <small class="form-text">默认已勾选全部设备；取消勾选可排除设备</small>
+                                <div id="deviceChecklist" style="border: 1px solid var(--border-color); border-radius: 0.75rem; padding: 0.75rem; max-height: 260px; overflow: auto;">
+                                    <div class="settings-empty">请先选择 Llama.cpp 版本</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 右侧：全部的参数配置 -->
+                        <div id="dynamicParamsContainer">
+                            <div class="loading-spinner">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                        <div id="benchmarkParamsContainer" style="display:none;">
+                            <div class="loading-spinner">
+                                <div class="spinner"></div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('loadModelModal')">取消</button>
+                <button class="btn btn-secondary" id="estimateVramBtn" onclick="estimateVramAction()"><i class="fas fa-memory"></i> 估算显存</button>
+                <button class="btn btn-secondary" id="modelActionResetBtn" style="display:none;" onclick="resetModelBenchmarkForm()">重置</button>
+                <button class="btn btn-primary" id="modelActionSubmitBtn" onclick="submitModelAction()">加载模型</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="addModelPathModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">添加模型目录</h3>
+                <button class="modal-close" onclick="closeModal('addModelPathModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">名称</label>
+                    <input class="form-control" id="addModelPathNameInput" placeholder="例如：本地模型库">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">目录路径</label>
+                    <input class="form-control" id="addModelPathInput" placeholder="/path/to/models">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">描述</label>
+                    <input class="form-control" id="addModelPathDescInput" placeholder="可选：说明用途、存放的模型类型等">
+                    <small class="form-text">支持多个模型根目录，将合并检索其中所有 GGUF 模型。</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addModelPathModal')">取消</button>
+                <button class="btn btn-primary" onclick="addModelPath()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Console Modal -->
+    <div class="modal" id="consoleModal">
+        <div class="modal-content" style="max-width: 1000px; height: 85vh;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-terminal"></i> 控制台输出</h3>
+                <button class="modal-close" onclick="closeModal('consoleModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; padding: 0;">
+                <div style="display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--border-color); background: #f8f9fa;">
+                    <button class="btn btn-secondary btn-sm" id="refreshConsoleBtn"><i class="fas fa-sync-alt"></i> 刷新</button>
+                    <label style="display:inline-flex; align-items:center; gap:6px; font-size: 14px;">
+                        <input type="checkbox" id="autoRefreshConsole"> 自动刷新
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:6px; font-size: 14px;">
+                        间隔(ms)
+                        <input class="form-control" type="number" id="intervalConsoleInput" value="2000" min="500" style="width:80px; padding: 4px 8px;">
+                    </label>
+                    <div id="consoleStatusText" style="font-size:12px; color:var(--text-secondary); margin-left:auto;"></div>
+                </div>
+                <div id="logContainer" style="flex: 1; overflow:auto; padding:16px; font-family:'Menlo', 'Monaco', 'Courier New', monospace; background:#0f172a; color:#e5e7eb; font-size: 0.875rem;">
+                    <pre id="consoleContent" style="margin:0; white-space:pre-wrap; word-break:break-word;"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('consoleModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="hfGgufModal">
+        <div class="modal-content" style="max-width: 1100px; height: 85vh;background-color: #f9fafb;">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-file"></i> GGUF 文件</h3>
+                <button class="modal-close" onclick="closeModal('hfGgufModal')">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
+                    <div class="mono" id="hfGgufModalRepo" style="color: var(--text-secondary); font-size: 0.875rem; font-weight: 700;">-</div>
+                    <div style="margin-left: auto; display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary btn-sm" onclick="copyAllGgufLinks()" title="复制所有下载链接">
+                            <i class="fas fa-copy"></i>
+                            复制全部
+                        </button>
+                    </div>
+                </div>
+                <div id="hfGgufList" style="flex: 1; min-height: 0; overflow: auto;">
+                    <div class="empty-state">选择一个模型以列出 GGUF 文件</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('hfGgufModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="createDownloadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-download"></i> 创建下载任务</h3>
+                <button class="modal-close" onclick="closeModal('createDownloadModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createDownloadForm">
+                    <div class="form-group">
+                        <label class="form-label" for="downloadUrl">下载URL</label>
+                        <input type="url" class="form-control" id="downloadUrl" name="downloadUrl" placeholder="https://example.com/file.zip" required>
+                        <small class="form-text">输入要下载的文件的完整URL地址</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="downloadPath">保存路径</label>
+                        <input type="text" class="form-control" id="downloadPath" name="downloadPath" placeholder="downloads" value="C:\Users\Mark\Downloads" required>
+                        <small class="form-text">文件保存的相对路径，默认为downloads目录</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="downloadFileName">文件名（可选）</label>
+                        <input type="text" class="form-control" id="downloadFileName" name="downloadFileName" placeholder="留空使用URL中的文件名">
+                        <small class="form-text">自定义保存的文件名，留空则使用URL中的原始文件名</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('createDownloadModal')">取消</button>
+                <button class="btn btn-primary" onclick="DownloadManager.submitCreateDownload()">创建任务</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="fas fa-cog"></i> 系统设置</h3>
+                <button class="modal-close" onclick="closeModal('settingsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsForm">
+                    <div class="form-group">
+                        <label class="form-label" for="defaultDownloadPath">默认下载目录</label>
+                        <input type="text" class="form-control" id="defaultDownloadPath" name="defaultDownloadPath" placeholder="download">
+                        <small class="form-text">设置默认的文件下载保存路径</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('settingsModal')">取消</button>
+                <button class="btn btn-primary" onclick="DownloadManager.saveSettings()">保存设置</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="dynamicModalRoot"></div>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="js/websocket.js"></script>
+    <script src="js/console-modal.js"></script>
+    <script src="js/model-llamacpp-setting.js"></script>
+    <script src="js/hf.js"></script>
+    <script src="js/download.js"></script>
+    
+    <script>
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', function() {
+            loadModels();
+            initWebSocket();
+            initModelSearch();
+            loadParamConfig();
+            updateChatCompletionLinkForDevice();
+            initCompatServiceToggles();
+            initSettingsForms();
+            loadCompatServiceStatus();
+        });
+
+        function isMobileBrowser() {
+            const ua = (navigator.userAgent || '').toLowerCase();
+            if (/(android|iphone|ipod|ipad|windows phone|iemobile|blackberry|bb10|webos)/i.test(ua)) return true;
+            if (navigator.maxTouchPoints && navigator.maxTouchPoints > 1) {
+                return window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
+            }
+            return false;
+        }
+
+        function updateChatCompletionLinkForDevice() {
+            const link = document.getElementById('nav-chat-completion');
+            if (!link) return;
+            if (isMobileBrowser()) {
+                link.href = 'chat/completion-mobile.html';
+            }
+        }
+        
+        // --- 动态参数配置 ---
+        let paramConfig = [];
+        
+        // 加载参数配置
+        function loadParamConfig() {
+            fetch('/api/models/param/server/list')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.params) {
+                        paramConfig = data.params;
+                        renderDynamicParams();
+                    } else {
+                        console.error('加载参数配置失败:', data.error || '未知错误');
+                        document.getElementById('dynamicParamsContainer').innerHTML =
+                            '<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="empty-state-title">加载失败</div><div class="empty-state-text">无法加载参数配置</div></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载参数配置出错:', error);
+                    document.getElementById('dynamicParamsContainer').innerHTML =
+                        '<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="empty-state-title">网络错误</div><div class="empty-state-text">无法连接到服务器</div></div>';
+                });
+        }
+        
+        // 渲染动态参数
+        function renderDynamicParams() {
+            const container = document.getElementById('dynamicParamsContainer');
+            if (!container) return;
+            
+            // 按 sort 排序
+            const sortedParams = [...paramConfig].sort((a, b) => (a.sort || 0) - (b.sort || 0));
+            
+            let html = '';
+            
+            // 渲染所有参数
+            if (sortedParams.length > 0) {
+                html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">';
+                sortedParams.forEach(param => {
+                    html += renderParamField(param, false);
+                });
+                html += '</div>';
+            }
+            
+            // 添加额外参数输入框
+            html += '<div class="form-group" style="margin-top: 1rem;">';
+            html += '<label class="form-label" for="extraParams">额外参数</label>';
+            html += '<textarea class="form-control" id="extraParams" name="extraParams" rows="2" placeholder="例如: --grp-attn-n 8 --grp-attn-w 512"></textarea>';
+            html += '<small class="form-text">输入额外的命令行参数，用空格分隔</small>';
+            html += '</div>';
+            
+            container.innerHTML = html;
+        }
+        
+        // 渲染单个参数字段
+        function renderParamField(param, isBasic) {
+            const fullNameRaw = param.fullName == null ? '' : String(param.fullName);
+            const abbrRaw = param.abbreviation == null ? '' : String(param.abbreviation);
+            let fieldName = fullNameRaw.replace(/^--/, '').replace(/^-/, '');
+            if (!fieldName) fieldName = abbrRaw.replace(/^--/, '').replace(/^-/, '');
+            if (!fieldName) {
+                const base = (param.name == null ? '' : String(param.name)).trim()
+                    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+                    .replace(/^_+|_+$/g, '');
+                const sortRaw = param.sort == null ? '' : String(param.sort).trim();
+                fieldName = 'unnamed_' + (base || 'param') + (sortRaw ? '_' + sortRaw : '');
+            }
+            const fieldId = 'param_' + fieldName;
+            const displayName = param.name;
+            const description = param.description || '';
+            const defaultValue = param.defaultValue || '';
+            const type = param.type || 'STRING';
+            const values = param.values || [];
+            
+            let html = '';
+            
+            // 生成带 tooltip 的 label
+            const labelHtml = description
+                ? `<label class="form-label" for="${fieldId}">${displayName} <i class="fas fa-question-circle" style="color: #DCDCDC; cursor: help; margin-left: 4px;" title="${description}"></i></label>`
+                : `<label class="form-label" for="${fieldId}">${displayName}</label>`;
+            
+            // 如果有 values，使用下拉选单
+            if (values && values.length > 0) {
+                html += '<div class="form-group">';
+                html += labelHtml;
+                html += `<select class="form-control" id="${fieldId}" name="${fieldName}">`;
+                values.forEach(v => {
+                    const selected = v === defaultValue ? 'selected' : '';
+                    html += `<option value="${v}" ${selected}>${v}</option>`;
+                });
+                html += '</select>';
+                html += '</div>';
+            } else {
+                // 根据 type 渲染不同的输入控件
+                switch (type) {
+                    case 'INTEGER':
+                        html += '<div class="form-group">';
+                        html += labelHtml;
+                        html += `<input type="number" class="form-control" id="${fieldId}" name="${fieldName}" value="${defaultValue}">`;
+                        html += '</div>';
+                        break;
+                        
+                    case 'FLOAT':
+                        html += '<div class="form-group">';
+                        html += labelHtml;
+                        html += `<input type="number" step="0.01" class="form-control" id="${fieldId}" name="${fieldName}" value="${defaultValue}">`;
+                        html += '</div>';
+                        break;
+                        
+                    case 'BOOLEAN':
+                        html += '<div class="form-group">';
+                        html += labelHtml;
+                        html += `<select class="form-control" id="${fieldId}" name="${fieldName}">`;
+                        html += `<option value="0" ${defaultValue === '0' || defaultValue === 'false' ? 'selected' : ''}>false</option>`;
+                        html += `<option value="1" ${defaultValue === '1' || defaultValue === 'true' || defaultValue === 'on' ? 'selected' : ''}>true</option>`;
+                        html += '</select>';
+                        html += '</div>';
+                        break;
+                        
+                    case 'LOGIC':
+                        html += '<div class="form-group">';
+                        html += labelHtml;
+                        html += `<select class="form-control" id="${fieldId}" name="${fieldName}">`;
+                        html += `<option value="0" ${defaultValue === '0' || defaultValue === 'false' ? 'selected' : ''}>false</option>`;
+                        html += `<option value="1" ${defaultValue === '1' || defaultValue === 'true' ? 'selected' : ''}>true</option>`;
+                        html += '</select>';
+                        html += '</div>';
+                        break;
+                        
+                    case 'STRING':
+                    default:
+                        html += '<div class="form-group">';
+                        html += labelHtml;
+                        html += `<input type="text" class="form-control" id="${fieldId}" name="${fieldName}" value="${defaultValue}">`;
+                        html += '</div>';
+                        break;
+                }
+            }
+            
+            return html;
+        }
+
+        function formatFileSize(size) {
+            if (size < 1024) return size + ' B';
+            if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB';
+            if (size < 1024 * 1024 * 1024) return (size / (1024 * 1024)).toFixed(1) + ' MB';
+            return (size / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+        }
+
+        function openSlotsModal(modelId, displayName) {
+            const modalId = 'slotsModal';
+            let modal = document.getElementById(modalId);
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = modalId;
+                modal.className = 'modal';
+                modal.innerHTML = `
+                    <div class="modal-content slots-modal">
+                        <div class="modal-header">
+                            <h3 class="modal-title">缓存管理 - ${displayName}</h3>
+                            <button class="modal-close" onclick="closeModal('${modalId}')">&times;</button>
+                        </div>
+                        <div class="modal-body" id="${modalId}Content">
+                            <div style="padding: 12px;">加载中...</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" onclick="closeModal('${modalId}')">关闭</button>
+                            <button class="btn btn-primary" onclick="saveSelectedSlot('${modelId}')">保存</button>
+                            <button class="btn btn-primary" onclick="loadSelectedSlot('${modelId}')">读取</button>
+                            <button class="btn btn-primary" onclick="fetchSlotsForModel('${modelId}')">刷新</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+            }
+            modal.classList.add('show');
+            fetchSlotsForModel(modelId);
+        }
+
+        function fetchSlotsForModel(modelId) {
+            const container = document.getElementById('slotsModalContent');
+            fetch(`/api/models/slots/get?modelId=${encodeURIComponent(modelId)}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.success) {
+                        const el = document.getElementById('slotsModalContent') || document.getElementById('slotsModal').querySelector('.modal-body');
+                        if (el) el.innerHTML = `<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="empty-state-title">加载失败</div><div class="empty-state-text">${d.error || '未知错误'}</div></div>`;
+                        return;
+                    }
+                    const slots = (d.data && d.data.slots) ? d.data.slots : [];
+                    renderSlotsContent(slots);
+                })
+                .catch(e => {
+                    const el = document.getElementById('slotsModalContent') || document.getElementById('slotsModal').querySelector('.modal-body');
+                    if (el) el.innerHTML = `<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="empty-state-title">网络错误</div><div class="empty-state-text">${e.message || ''}</div></div>`;
+                });
+        }
+
+        function saveSelectedSlot(modelId) {
+            const selectEl = document.getElementById('slotSelect');
+            const slots = window.__slotsData || [];
+            if (!selectEl || !slots.length) {
+                showToast('错误', '未找到可保存的Slot', 'error');
+                return;
+            }
+            const idx = parseInt(selectEl.value, 10) || 0;
+            const slot = slots[idx];
+            if (!slot && idx < 0) {
+                showToast('错误', '未选择有效的Slot', 'error');
+                return;
+            }
+            let slotId = slot && slot.id !== undefined ? slot.id : idx;
+            slotId = parseInt(slotId, 10);
+            if (Number.isNaN(slotId)) slotId = idx;
+            fetch('/api/models/slots/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ modelId, slotId })
+            }).then(r => r.json()).then(res => {
+                if (res && res.success) {
+                    showToast('成功', '保存成功', 'success');
+                } else {
+                    showToast('错误', (res && res.error) ? res.error : '保存失败', 'error');
+                }
+            }).catch(() => {
+                showToast('错误', '网络请求失败', 'error');
+            });
+        }
+        
+        function loadSelectedSlot(modelId) {
+            const selectEl = document.getElementById('slotSelect');
+            const slots = window.__slotsData || [];
+            if (!selectEl || !slots.length) {
+                showToast('错误', '未找到可读取的Slot', 'error');
+                return;
+            }
+            const idx = parseInt(selectEl.value, 10) || 0;
+            const slot = slots[idx];
+            if (!slot && idx < 0) {
+                showToast('错误', '未选择有效的Slot', 'error');
+                return;
+            }
+            let slotId = slot && slot.id !== undefined ? slot.id : idx;
+            slotId = parseInt(slotId, 10);
+            if (Number.isNaN(slotId)) slotId = idx;
+            fetch('/api/models/slots/load', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ modelId, slotId })
+            }).then(r => r.json()).then(res => {
+                if (res && res.success) {
+                    showToast('成功', '读取成功', 'success');
+                } else {
+                    showToast('错误', (res && res.error) ? res.error : '读取失败', 'error');
+                }
+            }).catch(() => {
+                showToast('错误', '网络请求失败', 'error');
+            });
+        }
+
+        function renderSlotsContent(slots) {
+            const modal = document.getElementById('slotsModal');
+            const body = document.getElementById('slotsModalContent') || (modal ? modal.querySelector('.modal-body') : null);
+            if (!body) return;
+            if (!slots || !slots.length) {
+                body.innerHTML = `<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-database"></i></div><div class="empty-state-title">无可用Slot</div><div class="empty-state-text">当前模型没有可用的处理槽位</div></div>`;
+                return;
+            }
+            window.__slotsData = slots;
+            const prevIndex = (() => {
+                const sel = document.getElementById('slotSelect');
+                if (sel && sel.value !== '') {
+                    const v = parseInt(sel.value, 10);
+                    if (!Number.isNaN(v)) return v;
+                }
+                return 0;
+            })();
+            let html = '';
+            html += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">`;
+            html += `<label class="form-label" for="slotSelect" style="margin:0;">选择 Slot</label>`;
+            html += `<select class="form-control" id="slotSelect" style="max-width:320px;">`;
+            slots.forEach((s, idx) => {
+                const id = s.id !== undefined ? s.id : idx;
+                const running = s.is_processing ? '处理中' : '空闲';
+                const nctx = s.n_ctx !== undefined ? s.n_ctx : '';
+                html += `<option value="${idx}">ID ${id} · ${running} · ctx ${nctx}</option>`;
+            });
+            html += `</select>`;
+            html += `</div>`;
+            html += `<pre id="slotJsonViewer" style="flex:1; min-height:0; overflow:auto; font-size:13px; background:#111827; color:#e5e7eb; padding:10px; border-radius:0.75rem;"></pre>`;
+            body.id = 'slotsModalContent';
+            body.innerHTML = html;
+            const selectEl = document.getElementById('slotSelect');
+            if (selectEl) {
+                const idx = Math.min(Math.max(prevIndex, 0), slots.length - 1);
+                selectEl.selectedIndex = idx;
+                selectEl.onchange = updateSlotJsonViewer;
+            }
+            updateSlotJsonViewer();
+        }
+
+        function updateSlotJsonViewer() {
+            const slots = window.__slotsData || [];
+            const selectEl = document.getElementById('slotSelect');
+            const viewer = document.getElementById('slotJsonViewer');
+            if (!selectEl || !viewer || !slots.length) return;
+            const idx = parseInt(selectEl.value, 10) || 0;
+            const slot = slots[idx];
+            if (!slot) {
+                viewer.textContent = '';
+                return;
+            }
+            try {
+                viewer.textContent = JSON.stringify(slot, null, 2);
+            } catch (e) {
+                viewer.textContent = '';
+            }
+        }
+
+        function showModelLoadingState(modelId) {
+            let loadingToast = document.getElementById('loading-toast-' + modelId);
+            if (!loadingToast) {
+                const toastContainer = document.getElementById('toastContainer');
+                const toastHtml = `
+                    <div class="toast info" id="loading-toast-${modelId}">
+                        <div class="toast-icon"><i class="fas fa-spinner fa-spin"></i></div>
+                        <div class="toast-content"><div class="toast-title">加载中</div><div class="toast-message">正在加载...</div></div>
+                    </div>`;
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            }
+        }
+        function removeModelLoadingState(modelId) {
+            const el = document.getElementById('loading-toast-' + modelId);
+            if (el) el.remove();
+        }
+
+        function stopModel(modelId) {
+             fetch('/api/models/stop', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ modelId })
+            }).then(r => r.json()).then(d => {
+                if (!d.success) {
+                    showToast('错误', d.error, 'error');
+                    return;
+                }
+                removeModelLoadingState(modelId);
+            });
+        }
+
+        // 关闭对话框
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('show');
+            if (id === 'consoleModal') stopConsoleAuto();
+            if (id === 'loadModelModal') {
+                document.getElementById('loadModelForm').reset();
+                const btn = document.getElementById('modelActionSubmitBtn');
+                if (btn) btn.disabled = false;
+                setModelActionMode('load');
+            }
+            if (id === 'createDownloadModal') {
+                const form = document.getElementById('createDownloadForm');
+                if (form) form.reset();
+            } else if (id === 'settingsModal') {
+                const form = document.getElementById('settingsForm');
+                if (form) form.reset();
+            }
+        }
+        
+        // Window clicks
+        window.onclick = function(e) {
+            if (e.target.classList.contains('modal')) {
+                if (e.target.id === 'loadModelModal') {
+                    if (window.__modelActionMode === 'config') closeModal('loadModelModal');
+                } else {
+                    closeModal(e.target.id);
+                }
+            }
+        };
+
+        function showToast(title, msg, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const id = 'toast-' + Date.now();
+            const html = `
+                <div class="toast ${type}" id="${id}">
+                    <div class="toast-icon"><i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i></div>
+                    <div class="toast-content"><div class="toast-title">${title}</div><div class="toast-message">${msg}</div></div>
+                    <button class="toast-close" onclick="document.getElementById('${id}').remove()">&times;</button>
+                </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+            setTimeout(() => { const el = document.getElementById(id); if (el) el.remove(); }, 5000);
+        }
+        
+        // Alias Logic
+         function openAliasModal(modelId, originalName, currentAlias) {
+            const modalId = 'aliasModal';
+            let modal = document.getElementById(modalId);
+            if (!modal) {
+                modal = document.createElement('div'); modal.id = modalId; modal.className = 'modal';
+                modal.innerHTML = `<div class="modal-content" style="max-width:500px;"><div class="modal-header"><h3 class="modal-title">设置别名</h3><button class="modal-close" onclick="closeModal('${modalId}')">&times;</button></div><div class="modal-body"><div class="form-group"><label class="form-label">原名</label><input class="form-control" id="aliasOriginalName" readonly></div><div class="form-group"><label class="form-label">别名</label><input class="form-control" id="aliasInput"></div></div><div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${modalId}')">取消</button><button class="btn btn-primary" onclick="submitAlias()">保存</button></div></div>`;
+                document.body.appendChild(modal);
+            }
+            window.__aliasEditingModelId = modelId;
+            document.getElementById('aliasOriginalName').value = originalName;
+            document.getElementById('aliasInput').value = currentAlias;
+            modal.classList.add('show');
+        }
+        function submitAlias() {
+            const modelId = window.__aliasEditingModelId;
+            const alias = document.getElementById('aliasInput').value;
+             fetch('/api/models/alias/set', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ modelId, alias })
+            }).then(r => r.json()).then(d => {
+                if (d.success) { showToast('成功', '别名已保存', 'success'); closeModal('aliasModal'); refreshModels(); }
+                else { showToast('错误', d.error, 'error'); }
+            });
+        }
+        
+        // Settings Logic (simplified)
+        let editingModelPath = null;
+        function openAddModelPathModal() {
+            editingModelPath = null;
+            const nameEl = document.getElementById('addModelPathNameInput');
+            const pathEl = document.getElementById('addModelPathInput');
+            const descEl = document.getElementById('addModelPathDescInput');
+            if (nameEl) nameEl.value = '';
+            if (pathEl) pathEl.value = '';
+            if (descEl) descEl.value = '';
+            const titleEl = document.querySelector('#addModelPathModal .modal-title');
+            if (titleEl) titleEl.textContent = '添加模型目录';
+            document.getElementById('addModelPathModal').classList.add('show');
+        }
+        function refreshModelPathUi() {
+            if (document.getElementById('modelPathList')) {
+                loadModelPathList();
+            }
+        }
+        function editModelPath(path, name, desc) {
+            editingModelPath = path;
+            document.getElementById('addModelPathInput').value = path || '';
+            document.getElementById('addModelPathNameInput').value = name || '';
+            document.getElementById('addModelPathDescInput').value = desc || '';
+            const titleEl = document.querySelector('#addModelPathModal .modal-title');
+            if (titleEl) titleEl.textContent = '编辑模型目录';
+            document.getElementById('addModelPathModal').classList.add('show');
+        }
+        async function addModelPath() {
+            const path = document.getElementById('addModelPathInput').value.trim();
+            const name = document.getElementById('addModelPathNameInput').value.trim();
+            const description = document.getElementById('addModelPathDescInput').value.trim();
+            if (path) {
+                const payload = { path };
+                if (name) payload.name = name;
+                if (description) payload.description = description;
+                try {
+                    if (editingModelPath) {
+                        const response = await fetch('/api/model/path/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ originalPath: editingModelPath, ...payload })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            showToast('成功', '更新成功', 'success');
+                            editingModelPath = null;
+                            document.getElementById('addModelPathInput').value = '';
+                            document.getElementById('addModelPathNameInput').value = '';
+                            document.getElementById('addModelPathDescInput').value = '';
+                            closeModal('addModelPathModal');
+                            refreshModelPathUi();
+                        } else {
+                            showToast('错误', data.error || '更新失败', 'error');
+                        }
+                        return;
+                    }
+
+                    const response = await fetch('/api/model/path/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        showToast('成功', '添加成功', 'success');
+                        editingModelPath = null;
+                        document.getElementById('addModelPathInput').value = '';
+                        document.getElementById('addModelPathNameInput').value = '';
+                        document.getElementById('addModelPathDescInput').value = '';
+                        closeModal('addModelPathModal');
+                        refreshModelPathUi();
+                    } else {
+                        showToast('错误', data.error || '添加失败', 'error');
+                    }
+                } catch (error) {
+                    showToast('错误', '网络请求失败', 'error');
+                }
+            } else {
+                showToast('错误', '目录路径不能为空', 'error');
+            }
+        }
+        
+        function shutdownService() {
+            if (confirm('确定要停止服务吗？')) {
+                fetch('/api/shutdown', { method: 'POST' }).then(r=>r.json()).then(d => {
+                    if (d.success) {
+                        document.body.innerHTML = '<div style="width: 100%;display:flex;justify-content:center;align-items:center;height:100vh;"><h1>服务已停止</h1></div>';
+                    }
+                });
+            }
+        }
+        
+        function initCompatServiceToggles() {
+            const ollama = document.getElementById('toggleOllamaCompat');
+            if (ollama) {
+                ollama.addEventListener('change', () => setCompatServiceEnabled('ollama', ollama.checked, ollama));
+            }
+            const lmstudio = document.getElementById('toggleLmstudioCompat');
+            if (lmstudio) {
+                lmstudio.addEventListener('change', () => setCompatServiceEnabled('lmstudio', lmstudio.checked, lmstudio));
+            }
+        }
+
+        function initSettingsForms() {
+            const savePortsBtn = document.getElementById('saveCompatPortsBtn');
+            if (savePortsBtn) {
+                savePortsBtn.addEventListener('click', saveCompatPorts);
+            }
+            const saveZhipuBtn = document.getElementById('saveZhipuSearchApiKeyBtn');
+            if (saveZhipuBtn) {
+                saveZhipuBtn.addEventListener('click', saveZhipuSearchApiKey);
+            }
+        }
+        
+        async function loadCompatServiceStatus() {
+            try {
+                const response = await fetch('/api/sys/compat/status', { method: 'GET' });
+                const data = await response.json();
+                if (!data || !data.success || !data.data) {
+                    return;
+                }
+                
+                const ollama = document.getElementById('toggleOllamaCompat');
+                if (ollama && data.data.ollama) {
+                    const enabled = (typeof data.data.ollama.enabled === 'boolean')
+                        ? !!data.data.ollama.enabled
+                        : (typeof data.data.ollama.running === 'boolean' ? !!data.data.ollama.running : false);
+                    ollama.checked = enabled;
+                }
+                const ollamaPort = document.getElementById('ollamaCompatPortInput');
+                if (ollamaPort && data.data.ollama) {
+                    const p = data.data.ollama.configuredPort || data.data.ollama.port;
+                    if (typeof p === 'number' && p > 0) {
+                        ollamaPort.value = String(p);
+                    }
+                }
+                
+                const lmstudio = document.getElementById('toggleLmstudioCompat');
+                if (lmstudio && data.data.lmstudio) {
+                    const enabled = (typeof data.data.lmstudio.enabled === 'boolean')
+                        ? !!data.data.lmstudio.enabled
+                        : (typeof data.data.lmstudio.running === 'boolean' ? !!data.data.lmstudio.running : false);
+                    lmstudio.checked = enabled;
+                }
+                const lmstudioPort = document.getElementById('lmstudioCompatPortInput');
+                if (lmstudioPort && data.data.lmstudio) {
+                    const p = data.data.lmstudio.configuredPort || data.data.lmstudio.port;
+                    if (typeof p === 'number' && p > 0) {
+                        lmstudioPort.value = String(p);
+                    }
+                }
+            } catch (e) {
+            }
+        }
+
+        function readPortFromInput(id) {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            const raw = (el.value || '').trim();
+            if (!raw) return null;
+            const n = Number(raw);
+            if (!Number.isFinite(n)) return null;
+            const port = Math.trunc(n);
+            if (port <= 0 || port > 65535) return null;
+            return port;
+        }
+
+        async function saveCompatPorts() {
+            const ollamaPort = readPortFromInput('ollamaCompatPortInput');
+            const lmstudioPort = readPortFromInput('lmstudioCompatPortInput');
+            if (!ollamaPort && !lmstudioPort) {
+                showToast('错误', '请至少填写一个端口', 'error');
+                return;
+            }
+            const payload = {};
+            if (ollamaPort) payload.ollamaPort = ollamaPort;
+            if (lmstudioPort) payload.lmstudioPort = lmstudioPort;
+            try {
+                const response = await fetch('/api/sys/setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!data || !data.success) {
+                    showToast('错误', (data && data.error) ? data.error : '保存失败', 'error');
+                    return;
+                }
+                showToast('成功', '端口已保存', 'success');
+                loadCompatServiceStatus();
+            } catch (e) {
+                showToast('错误', '网络请求失败', 'error');
+            }
+        }
+
+        async function saveZhipuSearchApiKey() {
+            const el = document.getElementById('zhipuSearchApiKeyInput');
+            const apiKey = el ? (el.value || '').trim() : '';
+            try {
+                const response = await fetch('/api/search/setting', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ zhipu_search_apikey: apiKey })
+                });
+                const data = await response.json();
+                if (!data || !data.success) {
+                    showToast('错误', (data && data.error) ? data.error : '保存失败', 'error');
+                    return;
+                }
+                showToast('成功', '已保存', 'success');
+                if (el) el.value = '';
+            } catch (e) {
+                showToast('错误', '网络请求失败', 'error');
+            }
+        }
+        
+        async function setCompatServiceEnabled(type, enable, toggleEl) {
+            const endpoint = type === 'ollama' ? '/api/sys/ollama' : '/api/sys/lmstudio';
+            const prev = !enable;
+            if (toggleEl) toggleEl.disabled = true;
+            try {
+                const body = { enable: !!enable };
+                const port = type === 'ollama' ? readPortFromInput('ollamaCompatPortInput') : readPortFromInput('lmstudioCompatPortInput');
+                if (port) body.port = port;
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await response.json();
+                if (!data || !data.success) {
+                    if (toggleEl) toggleEl.checked = prev;
+                    showToast('错误', (data && data.error) ? data.error : '操作失败', 'error');
+                    return;
+                }
+                showToast('成功', enable ? '已开启' : '已关闭', 'success');
+                loadCompatServiceStatus();
+            } catch (e) {
+                if (toggleEl) toggleEl.checked = prev;
+                showToast('错误', '网络请求失败', 'error');
+            } finally {
+                if (toggleEl) toggleEl.disabled = false;
+            }
+        }
+        
+        function filterModels(k) {
+            k = k.toLowerCase();
+            document.querySelectorAll('.model-item').forEach(el => {
+                const name = el.querySelector('.model-name').textContent.toLowerCase();
+                el.style.display = name.includes(k) ? '' : 'none';
+            });
+        }
+        function initModelSearch() {
+            document.getElementById('modelSearchInput').addEventListener('input', (e) => filterModels(e.target.value));
+        }
+
+        // 显示模型列表页面
+        function showModelList() {
+            document.getElementById('main-model-list').style.display = '';
+            document.getElementById('main-llamacpp-setting').style.display = 'none';
+            document.getElementById('main-model-path-setting').style.display = 'none';
+            document.getElementById('main-settings').style.display = 'none';
+            document.getElementById('main-hf').style.display = 'none';
+            document.getElementById('main-download').style.display = 'none';
+            //refreshModels();
+            // 更新导航项高亮
+            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            const nav = document.getElementById('nav-model-list');
+            if (nav) nav.classList.add('active');
+        }
+
+        // 显示 Llama.cpp 设置页面
+        function showLlamaCppSetting() {
+            document.getElementById('main-model-list').style.display = 'none';
+            document.getElementById('main-llamacpp-setting').style.display = '';
+            document.getElementById('main-model-path-setting').style.display = 'none';
+            document.getElementById('main-settings').style.display = 'none';
+            document.getElementById('main-hf').style.display = 'none';
+            document.getElementById('main-download').style.display = 'none';
+            loadLlamaCppList();
+            // 更新导航项高亮
+            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            const nav = document.getElementById('nav-llamacpp');
+            if (nav) nav.classList.add('active');
+        }
+
+        // 显示模型路径配置页面
+        function showModelPathSetting() {
+            document.getElementById('main-model-list').style.display = 'none';
+            document.getElementById('main-llamacpp-setting').style.display = 'none';
+            document.getElementById('main-model-path-setting').style.display = '';
+            document.getElementById('main-settings').style.display = 'none';
+            document.getElementById('main-hf').style.display = 'none';
+            document.getElementById('main-download').style.display = 'none';
+            loadModelPathList();
+            // 更新导航项高亮
+            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            const nav = document.getElementById('nav-model-path');
+            if (nav) nav.classList.add('active');
+        }
+        
+        // 显示HugginggFace模型页面
+        function showHuggingFace() {
+            document.getElementById('main-model-list').style.display = 'none';
+            document.getElementById('main-llamacpp-setting').style.display = 'none';
+            document.getElementById('main-model-path-setting').style.display = 'none';
+            document.getElementById('main-settings').style.display = 'none';
+            document.getElementById('main-hf').style.display = '';
+            document.getElementById('main-download').style.display = 'none';
+            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            const nav = document.getElementById('nav-hf');
+            if (nav) nav.classList.add('active');
+        }
+
+        // 显示下载管理器
+        function showDownloadManager() {
+            document.getElementById('main-model-list').style.display = 'none';
+            document.getElementById('main-llamacpp-setting').style.display = 'none';
+            document.getElementById('main-model-path-setting').style.display = 'none';
+            document.getElementById('main-hf').style.display = 'none';
+            document.getElementById('main-settings').style.display = 'none';
+            const main = document.getElementById('main-download');
+            const hasEntered = main && main.dataset && main.dataset.entered === '1';
+            if (main) main.style.display = '';
+            if (window.DownloadManager && typeof window.DownloadManager.start === 'function') window.DownloadManager.start();
+            if (hasEntered && window.DownloadManager && typeof window.DownloadManager.refreshDownloads === 'function') window.DownloadManager.refreshDownloads();
+            if (main && main.dataset) main.dataset.entered = '1';
+            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            const nav = document.getElementById('nav-download');
+            if (nav) nav.classList.add('active');
+        }
+
+        function showSettingsPage(tab) {
+            document.getElementById('main-model-list').style.display = 'none';
+            document.getElementById('main-llamacpp-setting').style.display = 'none';
+            document.getElementById('main-model-path-setting').style.display = 'none';
+            document.getElementById('main-hf').style.display = 'none';
+            document.getElementById('main-download').style.display = 'none';
+            const main = document.getElementById('main-settings');
+            if (main) main.style.display = '';
+
+            selectSettingsTab(tab || 'general');
+
+            const navItems = document.querySelectorAll('.sidebar-nav .nav-item');
+            navItems.forEach(item => item.classList.remove('active'));
+            const nav = document.getElementById('nav-settings');
+            if (nav) nav.classList.add('active');
+        }
+
+        function selectSettingsTab(tab) {
+            const menuItems = document.querySelectorAll('#main-settings .settings-menu-item');
+            menuItems.forEach(btn => {
+                const active = btn && btn.dataset && btn.dataset.tab === tab;
+                btn.classList.toggle('active', !!active);
+                btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+
+            const panels = document.querySelectorAll('#main-settings .settings-panel');
+            panels.forEach(panel => {
+                const show = panel && panel.dataset && panel.dataset.tabPanel === tab;
+                panel.style.display = show ? '' : 'none';
+                if (show) {
+                    const frame = panel.querySelector('iframe[data-src]');
+                    if (frame && !frame.getAttribute('src')) {
+                        const src = frame.dataset ? frame.dataset.src : '';
+                        if (src) frame.setAttribute('src', src);
+                    }
+                }
+            });
+        }
+
+        // 加载模型路径列表
+        function loadModelPathList() {
+            const container = document.getElementById('modelPathList');
+            container.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+            fetch('/api/model/path/list')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const items = data.data.items || [];
+                        document.getElementById('modelPathCount').textContent = data.data.count || 0;
+                        renderModelPathListContent(items);
+                    } else {
+                        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="empty-state-title">加载失败</div><div class="empty-state-text">' + (data.error || '无法加载模型路径列表') + '</div></div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('加载模型路径列表出错:', error);
+                    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="empty-state-title">网络错误</div><div class="empty-state-text">无法连接到服务器</div></div>';
+                });
+        }
+
+        // 渲染模型路径列表内容
+        function renderModelPathListContent(items) {
+            const container = document.getElementById('modelPathList');
+            if (!items || items.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><i class="fas fa-folder-open"></i></div><div class="empty-state-title">暂无路径</div><div class="empty-state-text">尚未配置任何模型路径</div></div>';
+                return;
+            }
+
+            let html = '';
+            items.forEach((item, index) => {
+                const path = item.path || '';
+                const name = item.name || '';
+                const desc = item.description || '';
+                const displayName = name || path;
+                const escapedPath = path.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                const escapedName = name ? name.replace(/'/g, "\\'") : '';
+                const escapedDesc = desc ? desc.replace(/'/g, "\\'") : '';
+                html += `
+                    <div class="model-item">
+                        <div class="model-icon-wrapper">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <div class="model-details">
+                            <div class="model-name" title="${displayName}">${displayName}</div>
+                            <div class="model-meta">
+                                <span><i class="fas fa-folder"></i> ${path}</span>
+                            </div>
+                            ${desc ? `<div class="model-desc" title="${desc}"><i class="fas fa-info-circle"></i> ${desc}</div>` : ''}
+                        </div>
+                        <div class="model-actions">
+                            <button class="btn-icon" onclick="editModelPath('${escapedPath}', '${escapedName}', '${escapedDesc}')" title="编辑">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-icon danger" onclick="removeModelPath('${escapedPath}')" title="删除">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>                        
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // 删除模型路径
+        function removeModelPath(path) {
+            if (confirm('确定要删除此路径吗？')) {
+                fetch('/api/model/path/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: path })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast('成功', '路径已删除', 'success');
+                        refreshModelPathUi();
+                    } else {
+                        showToast('错误', data.error || '删除失败', 'error');
+                    }
+                })
+                .catch(error => {
+                    showToast('错误', '网络请求失败', 'error');
+                });
+            }
+        }
+    </script>
+    <script src="js/model-detail.js"></script>
+    <script src="js/model-list.js"></script>
+    <script src="js/model-action-modal.js"></script>
+    <script src="js/model-benchmark.js"></script>
+</body>
+</html>
